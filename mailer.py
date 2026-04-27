@@ -10,20 +10,18 @@ from email.mime.multipart import MIMEMultipart
 # Configuration
 EMAILS_FILE = 'emails.csv'
 STATE_FILE = 'state.json'
+TEMPLATE_FILE = 'template.html'
 DAILY_LIMIT = 500
 DELAY_SECONDS = 30
 
 # Global Message Template
 MESSAGE_SUBJECT = "Hello from SocioTech Services!"
-MESSAGE_BODY = """
-Dear Customer,
 
-This is a professional message sent to everyone.
-You can edit this text anytime in mailer.py.
-
-Best regards,
-Gourav Barua
-"""
+def load_template():
+    if os.path.exists(TEMPLATE_FILE):
+        with open(TEMPLATE_FILE, 'r', encoding='utf-8') as f:
+            return f.read()
+    return "Hello! (No template found)"
 
 # SMTP Configuration (Stored in GitHub Secrets)
 SMTP_SERVER = "smtp.gmail.com"
@@ -51,7 +49,7 @@ def send_email(to_email, subject, body):
         msg['From'] = EMAIL_USER
         msg['To'] = to_email
         msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain'))
+        msg.attach(MIMEText(body, 'html')) # Changed to html
 
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
             server.login(EMAIL_USER, EMAIL_PASS)
@@ -64,6 +62,7 @@ def send_email(to_email, subject, body):
 def main():
     state = load_state()
     today = datetime.now().strftime('%Y-%m-%d')
+    html_body = load_template()
 
     # Reset daily count if it's a new day
     if state['last_run_date'] != today:
@@ -99,7 +98,7 @@ def main():
         to_email = row.get('email')
         # Use global template instead of CSV columns
         subject = MESSAGE_SUBJECT
-        body = MESSAGE_BODY
+        body = html_body
 
         if not to_email:
             print(f"Skipping row {state['last_index'] + 1}: No email address.")
