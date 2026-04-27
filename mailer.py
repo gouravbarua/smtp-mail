@@ -13,6 +13,18 @@ STATE_FILE = 'state.json'
 DAILY_LIMIT = 500
 DELAY_SECONDS = 30
 
+# Global Message Template
+MESSAGE_SUBJECT = "Hello from SocioTech Services!"
+MESSAGE_BODY = """
+Dear Customer,
+
+This is a professional message sent to everyone.
+You can edit this text anytime in mailer.py.
+
+Best regards,
+Gourav Barua
+"""
+
 # SMTP Configuration (Stored in GitHub Secrets)
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
@@ -85,8 +97,9 @@ def main():
             break
 
         to_email = row.get('email')
-        subject = row.get('subject', 'No Subject')
-        body = row.get('body', '')
+        # Use global template instead of CSV columns
+        subject = MESSAGE_SUBJECT
+        body = MESSAGE_BODY
 
         if not to_email:
             print(f"Skipping row {state['last_index'] + 1}: No email address.")
