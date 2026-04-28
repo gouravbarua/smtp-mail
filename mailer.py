@@ -103,6 +103,16 @@ def main():
         print(f"Error reading emails file: {e}")
         return
 
+    # Fetch Unsubscribe List
+    unsubscribed_emails = set()
+    if supabase:
+        try:
+            res = supabase.table('unsubscribes').select('email').execute()
+            unsubscribed_emails = {row['email'] for row in res.data}
+            print(f"Loaded {len(unsubscribed_emails)} unsubscribed emails.")
+        except Exception as e:
+            print(f"Warning: Could not fetch unsubscribe list: {e}")
+
     if not emails_to_send:
         print("No new emails to send.")
         return
@@ -120,6 +130,13 @@ def main():
             break
 
         to_email = row.get('email')
+        
+        # Check Unsubscribe List
+        if to_email in unsubscribed_emails:
+            print(f"Skipping {to_email}: Unsubscribed.")
+            state['last_index'] += 1
+            continue
+            
         # Use global template instead of CSV columns
         subject = MESSAGE_SUBJECT
         body = html_body
@@ -152,12 +169,17 @@ def main():
                     pixel_url = f"{SUPABASE_URL}/functions/v1/track-open?id={tracking_id}"
                     current_body += f'<img src="{pixel_url}" width="1" height="1" style="display:none !important;" />'
                     
+                    # 3. Unsubscribe Link
+                    unsub_url = f"{SUPABASE_URL}/functions/v1/unsubscribe?email={urllib.parse.quote(to_email)}"
+                    current_body = current_body.replace("{{UNSUB_LINK}}", unsub_url)
+                    
                     print(f"Tracking enabled for {to_email}. ID: {tracking_id}")
             except Exception as e:
                 print(f"Supabase tracking error: {e}")
         
-        # Fallback if tracking failed or is disabled
+        # Fallback placeholders
         current_body = current_body.replace("{{TRACKING_LINK}}", "mailto:info@sociotechservices.com?subject=Inquiry%20from%20Sociotech%20Email")
+        current_body = current_body.replace("{{UNSUB_LINK}}", "#")
 
         # Rotate through available accounts alternatively
         account_index = state['emails_sent_today'] % len(ACCOUNTS)
