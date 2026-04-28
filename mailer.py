@@ -59,6 +59,7 @@ def send_email(to_email, subject, body, account):
         msg['From'] = user
         msg['To'] = to_email
         msg['Subject'] = subject
+        msg['Reply-To'] = 'info@sociotechservices.com'
         msg.attach(MIMEText(body, 'html'))
 
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
