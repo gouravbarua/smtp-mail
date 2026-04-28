@@ -3,6 +3,7 @@ import json
 import os
 import smtplib
 import time
+import urllib.parse
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -138,12 +139,23 @@ def main():
                 }).execute()
                 if res.data:
                     tracking_id = res.data[0]['id']
-                    # Append tracking pixel (Replace URL with your Edge Function URL later)
+                    
+                    # 1. Click Tracking for the Button
+                    target_mailto = "mailto:info@sociotechservices.com?subject=Inquiry%20from%20Sociotech%20Email"
+                    encoded_url = urllib.parse.quote(target_mailto)
+                    click_url = f"{SUPABASE_URL}/functions/v1/track-click?id={tracking_id}&url={encoded_url}"
+                    current_body = current_body.replace("{{TRACKING_LINK}}", click_url)
+                    
+                    # 2. Open Tracking Pixel
                     pixel_url = f"{SUPABASE_URL}/functions/v1/track-open?id={tracking_id}"
                     current_body += f'<img src="{pixel_url}" width="1" height="1" style="display:none !important;" />'
+                    
                     print(f"Tracking enabled for {to_email}. ID: {tracking_id}")
             except Exception as e:
                 print(f"Supabase tracking error: {e}")
+        
+        # Fallback if tracking failed or is disabled
+        current_body = current_body.replace("{{TRACKING_LINK}}", "mailto:info@sociotechservices.com?subject=Inquiry%20from%20Sociotech%20Email")
 
         # Rotate through available accounts alternatively
         account_index = state['emails_sent_today'] % len(ACCOUNTS)
