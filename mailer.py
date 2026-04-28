@@ -119,8 +119,9 @@ def main():
             state['last_index'] += 1
             continue
 
-        # Rotate through available accounts
-        current_account = ACCOUNTS[i % len(ACCOUNTS)]
+        # Rotate through available accounts alternatively
+        account_index = state['emails_sent_today'] % len(ACCOUNTS)
+        current_account = ACCOUNTS[account_index]
         
         print(f"Sending email to {to_email} using {current_account['user']} ({state['emails_sent_today'] + 1}/{DAILY_LIMIT})...")
         
