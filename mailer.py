@@ -98,7 +98,11 @@ def main():
         print("No new emails to send.")
         return
 
-    print(f"Found {len(emails_to_send)} new emails. Starting to send...")
+    if not ACCOUNTS:
+        print("Error: No sender accounts configured. Please set EMAIL_USER and EMAIL_PASS environment variables.")
+        return
+
+    print(f"Found {len(emails_to_send)} new emails. Starting to send using {len(ACCOUNTS)} accounts...")
 
     for i, row in enumerate(emails_to_send):
         if state['emails_sent_today'] >= DAILY_LIMIT:
