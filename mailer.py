@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from supabase import create_client, Client
 
 # Configuration
 EMAILS_FILE = 'emails.csv'
@@ -35,6 +36,11 @@ ACCOUNTS = [
 
 # Filter out empty accounts
 ACCOUNTS = [acc for acc in ACCOUNTS if acc["user"] and acc["pass"]]
+
+# Supabase Configuration
+SUPABASE_URL = os.getenv('SUPABASE_URL')
+SUPABASE_KEY = os.getenv('SUPABASE_KEY')
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 
 def load_state():
     if os.path.exists(STATE_FILE):
@@ -120,13 +126,32 @@ def main():
             state['last_index'] += 1
             continue
 
+        # Tracking Logic
+        tracking_id = None
+        current_body = body
+        if supabase:
+            try:
+                res = supabase.table('email_tracking').insert({
+                    "recipient_email": to_email,
+                    "subject": subject,
+                    "status": "sent"
+                }).execute()
+                if res.data:
+                    tracking_id = res.data[0]['id']
+                    # Append tracking pixel (Replace URL with your Edge Function URL later)
+                    pixel_url = f"{SUPABASE_URL}/functions/v1/track-open?id={tracking_id}"
+                    current_body += f'<img src="{pixel_url}" width="1" height="1" style="display:none !important;" />'
+                    print(f"Tracking enabled for {to_email}. ID: {tracking_id}")
+            except Exception as e:
+                print(f"Supabase tracking error: {e}")
+
         # Rotate through available accounts alternatively
         account_index = state['emails_sent_today'] % len(ACCOUNTS)
         current_account = ACCOUNTS[account_index]
         
         print(f"Sending email to {to_email} using {current_account['user']} ({state['emails_sent_today'] + 1}/{DAILY_LIMIT})...")
         
-        if send_email(to_email, subject, body, current_account):
+        if send_email(to_email, subject, current_body, current_account):
             state['emails_sent_today'] += 1
             state['last_index'] += 1
             save_state(state) # Save after each successful send

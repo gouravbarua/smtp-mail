@@ -22,12 +22,17 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
       - name: Run Mailer Script
         env:
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           EMAIL_USER_2: ${{ secrets.EMAIL_USER_2 }}
           EMAIL_PASS_2: ${{ secrets.EMAIL_PASS_2 }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python mailer.py
 
       - name: Commit and Push State
