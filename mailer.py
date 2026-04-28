@@ -37,6 +37,7 @@ ACCOUNTS = [
 
 # Filter out empty accounts
 ACCOUNTS = [acc for acc in ACCOUNTS if acc["user"] and acc["pass"]]
+print(f"Loaded {len(ACCOUNTS)} sender accounts.")
 
 # Supabase Configuration
 SUPABASE_URL = os.getenv('SUPABASE_URL')
@@ -107,10 +108,11 @@ def main():
         return
 
     if not ACCOUNTS:
-        print("Error: No sender accounts configured. Please set EMAIL_USER and EMAIL_PASS environment variables.")
+        print("CRITICAL ERROR: No sender accounts found! Check your GitHub Secrets (EMAIL_USER, EMAIL_PASS).")
         return
 
-    print(f"Found {len(emails_to_send)} new emails. Starting to send using {len(ACCOUNTS)} accounts...")
+    print(f"Daily progress: {state['emails_sent_today']}/{DAILY_LIMIT} emails sent today.")
+    print(f"Queue: Found {len(emails_to_send)} new emails starting from index {state['last_index'] + 1}.")
 
     for i, row in enumerate(emails_to_send):
         if state['emails_sent_today'] >= DAILY_LIMIT:
