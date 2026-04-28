@@ -11,7 +11,7 @@ from email.mime.multipart import MIMEMultipart
 EMAILS_FILE = 'emails.csv'
 STATE_FILE = 'state.json'
 TEMPLATE_FILE = 'template.html'
-DAILY_LIMIT = 500
+DAILY_LIMIT = 1000  # Total limit across all accounts (500 each)
 DELAY_SECONDS = 30
 
 # Global Message Template
@@ -23,11 +23,18 @@ def load_template():
             return f.read()
     return "Hello! (No template found)"
 
-# SMTP Configuration (Stored in GitHub Secrets)
+# SMTP Configuration (Multiple accounts supported)
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 465
-EMAIL_USER = os.getenv('EMAIL_USER')
-EMAIL_PASS = os.getenv('EMAIL_PASS')
+
+# List of sender accounts
+ACCOUNTS = [
+    {"user": os.getenv('EMAIL_USER'), "pass": os.getenv('EMAIL_PASS')},
+    {"user": os.getenv('EMAIL_USER_2'), "pass": os.getenv('EMAIL_PASS_2')}
+]
+
+# Filter out empty accounts
+ACCOUNTS = [acc for acc in ACCOUNTS if acc["user"] and acc["pass"]]
 
 def load_state():
     if os.path.exists(STATE_FILE):
@@ -39,20 +46,23 @@ def save_state(state):
     with open(STATE_FILE, 'w') as f:
         json.dump(state, f, indent=4)
 
-def send_email(to_email, subject, body):
-    if not EMAIL_USER or not EMAIL_PASS:
-        print("Error: EMAIL_USER or EMAIL_PASS environment variables not set.")
+def send_email(to_email, subject, body, account):
+    user = account["user"]
+    pw = account["pass"]
+    
+    if not user or not pw:
+        print(f"Error: Credentials for account {user} not set.")
         return False
 
     try:
         msg = MIMEMultipart()
-        msg['From'] = EMAIL_USER
+        msg['From'] = user
         msg['To'] = to_email
         msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'html')) # Changed to html
+        msg.attach(MIMEText(body, 'html'))
 
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
-            server.login(EMAIL_USER, EMAIL_PASS)
+            server.login(user, pw)
             server.send_message(msg)
         return True
     except Exception as e:
@@ -105,9 +115,12 @@ def main():
             state['last_index'] += 1
             continue
 
-        print(f"Sending email to {to_email} ({state['emails_sent_today'] + 1}/{DAILY_LIMIT})...")
+        # Rotate through available accounts
+        current_account = ACCOUNTS[i % len(ACCOUNTS)]
         
-        if send_email(to_email, subject, body):
+        print(f"Sending email to {to_email} using {current_account['user']} ({state['emails_sent_today'] + 1}/{DAILY_LIMIT})...")
+        
+        if send_email(to_email, subject, body, current_account):
             state['emails_sent_today'] += 1
             state['last_index'] += 1
             save_state(state) # Save after each successful send
