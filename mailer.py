@@ -3,11 +3,20 @@ import json
 import os
 import smtplib
 import time
+import logging
 import urllib.parse
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from supabase import create_client, Client
+
+# Configure Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+logger = logging.getLogger(__name__)
 
 # Configuration
 EMAILS_FILE = 'emails.csv'
@@ -60,7 +69,7 @@ ACCOUNTS = [
 
 # Filter out empty accounts
 ACCOUNTS = [acc for acc in ACCOUNTS if acc["user"] and acc["pass"]]
-print(f"Loaded {len(ACCOUNTS)} sender accounts.")
+logger.info(f"Loaded {len(ACCOUNTS)} sender accounts.")
 
 # Supabase Configuration
 SUPABASE_URL = os.getenv('SUPABASE_URL')
@@ -82,7 +91,7 @@ def send_email(to_email, subject, body, account, is_html=True):
     pw = account["pass"]
     
     if not user or not pw:
-        print(f"Error: Credentials for account {user} not set.")
+        logger.error(f"Credentials for account {user} not set.")
         return False
 
     try:
@@ -101,7 +110,7 @@ def send_email(to_email, subject, body, account, is_html=True):
             server.send_message(msg)
         return True
     except Exception as e:
-        print(f"Failed to send email to {to_email}: {e}")
+        logger.error(f"Failed to send email to {to_email} via {user}: {e}")
         return False
 
 def main():
@@ -115,7 +124,7 @@ def main():
         state['last_run_date'] = today
 
     if state['emails_sent_today'] >= DAILY_LIMIT:
-        print("Daily limit reached. Stopping.")
+        logger.info("Daily limit reached. Stopping.")
         return
 
     emails_to_send = []
@@ -126,7 +135,7 @@ def main():
             start_idx = state['last_index'] + 1
             emails_to_send = reader[start_idx:]
     except Exception as e:
-        print(f"Error reading emails file: {e}")
+        logger.error(f"Error reading emails file: {e}")
         return
 
     # Fetch Unsubscribe List
@@ -135,24 +144,24 @@ def main():
         try:
             res = supabase.table('unsubscribes').select('email').execute()
             unsubscribed_emails = {row['email'] for row in res.data}
-            print(f"Loaded {len(unsubscribed_emails)} unsubscribed emails.")
+            logger.info(f"Loaded {len(unsubscribed_emails)} unsubscribed emails.")
         except Exception as e:
-            print(f"Warning: Could not fetch unsubscribe list: {e}")
+            logger.warning(f"Could not fetch unsubscribe list: {e}")
 
     if not emails_to_send:
-        print("No new emails to send.")
+        logger.info("No new emails to send.")
         return
 
     if not ACCOUNTS:
-        print("CRITICAL ERROR: No sender accounts found! Check your GitHub Secrets (EMAIL_USER, EMAIL_PASS).")
+        logger.critical("No sender accounts found! Check your GitHub Secrets (EMAIL_USER, EMAIL_PASS).")
         return
 
-    print(f"Daily progress: {state['emails_sent_today']}/{DAILY_LIMIT} emails sent today.")
-    print(f"Queue: Found {len(emails_to_send)} new emails starting from index {state['last_index'] + 1}.")
+    logger.info(f"Daily progress: {state['emails_sent_today']}/{DAILY_LIMIT} emails sent today.")
+    logger.info(f"Queue: Found {len(emails_to_send)} new emails starting from index {state['last_index'] + 1}.")
 
     for i, row in enumerate(emails_to_send):
         if state['emails_sent_today'] >= DAILY_LIMIT:
-            print("Reached daily limit during processing.")
+            logger.info("Reached daily limit during processing.")
             break
 
         to_email = row.get('email')
@@ -174,7 +183,7 @@ def main():
 
         # Check Unsubscribe List
         if to_email in unsubscribed_emails:
-            print(f"Skipping {to_email}: Unsubscribed.")
+            logger.info(f"Skipping {to_email}: Unsubscribed.")
             state['last_index'] += 1
             continue
             
@@ -183,7 +192,7 @@ def main():
         body = html_body
 
         if not to_email:
-            print(f"Skipping row {state['last_index'] + 1}: No email address.")
+            logger.warning(f"Skipping row {state['last_index'] + 1}: No email address.")
             state['last_index'] += 1
             continue
 
@@ -217,11 +226,12 @@ def main():
                         current_body = current_body.replace("{{UNSUB_LINK}}", unsub_url)
                     else:
                         # For Text emails, we just append a simple unsub link at the end
-                        current_body += f"\n\nUnsubscribe: {SUPABASE_URL}/functions/v1/unsubscribe?email={urllib.parse.quote(to_email)}"
+                        unsub_url = f"{SUPABASE_URL}/functions/v1/unsubscribe?email={urllib.parse.quote(to_email)}"
+                        current_body += f"\n\nUnsubscribe: {unsub_url}"
                     
-                    print(f"Tracking enabled for {to_email} [{current_format}]. ID: {tracking_id}")
+                    logger.info(f"Tracking enabled for {to_email} [{current_format}]. ID: {tracking_id}")
             except Exception as e:
-                print(f"Supabase tracking error: {e}")
+                logger.error(f"Supabase tracking error: {e}")
         
         # Fallback placeholders for HTML
         if is_html:
@@ -232,7 +242,7 @@ def main():
         account_index = state['emails_sent_today'] % len(ACCOUNTS)
         current_account = ACCOUNTS[account_index]
         
-        print(f"Sending {current_format} email to {to_email} using {current_account['user']} ({state['emails_sent_today'] + 1}/{DAILY_LIMIT})...")
+        logger.info(f"Sending {current_format} email to {to_email} using {current_account['user']} ({state['emails_sent_today'] + 1}/{DAILY_LIMIT})...")
         
         if send_email(to_email, subject, current_body, current_account, is_html):
             state['emails_sent_today'] += 1
