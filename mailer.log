@@ -2,3 +2,12 @@
 2026-04-29 09:04:01,843 [CRITICAL] No sender accounts found! Check your GitHub Secrets (EMAIL_USER, EMAIL_PASS).
 2026-04-29 09:11:18,876 [INFO] Loaded 0 sender accounts.
 2026-04-29 09:11:18,877 [CRITICAL] No sender accounts found! Check your GitHub Secrets (EMAIL_USER, EMAIL_PASS).
+2026-04-29 11:40:21,842 [INFO] Loaded 1 sender accounts.
+2026-04-29 11:40:21,842 [INFO] Daily progress: 0/1000 emails sent today.
+2026-04-29 11:40:21,842 [INFO] Queue: Found 2 new emails starting from index 0.
+2026-04-29 11:40:21,842 [INFO] Sending HTML email to gouravbarua174@gmail.com using info@sociotechservices.com
+
+ (1/1000)...
+2026-04-29 11:40:52,987 [INFO] Sending HTML email to shivamssing35@gmail.com using info@sociotechservices.com
+
+ (2/1000)...
