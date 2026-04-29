@@ -16,8 +16,31 @@ TEMPLATE_FILE = 'template.html'
 DAILY_LIMIT = 1000  # Total limit across all accounts (500 each)
 DELAY_SECONDS = 30
 
-# Global Message Template
+# Global Message Templates
 MESSAGE_SUBJECT = "Transform Your Business with sociotech services"
+
+TEXT_TEMPLATE = """
+Hello,
+
+For years, transportation companies have focused on operations. Now it's time to grow online with SOCIOTECH.
+
+We help transport, trucking, courier, cargo and logistics businesses build their online presence and automate operations.
+
+Our Services:
+- Professional Websites
+- Logo & Branding
+- Custom Fleet Management Software
+- Professional Email Setup
+- Digital Growth & SEO
+- Hosting & Security
+
+LIMITED OFFER: First 50 customers get FREE services worth $199+
+
+Reply to this email or visit www.sociotechservices.com to get started.
+
+Best regards,
+The SOCIOTECH Team
+"""
 
 def load_template():
     if os.path.exists(TEMPLATE_FILE):
@@ -54,7 +77,7 @@ def save_state(state):
     with open(STATE_FILE, 'w') as f:
         json.dump(state, f, indent=4)
 
-def send_email(to_email, subject, body, account):
+def send_email(to_email, subject, body, account, is_html=True):
     user = account["user"]
     pw = account["pass"]
     
@@ -68,7 +91,10 @@ def send_email(to_email, subject, body, account):
         msg['To'] = to_email
         msg['Subject'] = subject
         msg['Reply-To'] = 'info@sociotechservices.com'
-        msg.attach(MIMEText(body, 'html'))
+        
+        # Attach body based on format
+        mime_type = 'html' if is_html else 'plain'
+        msg.attach(MIMEText(body, mime_type))
 
         with smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT) as server:
             server.login(user, pw)
@@ -131,6 +157,21 @@ def main():
 
         to_email = row.get('email')
         
+        # Determine format (0-199: HTML, 200-399: Text)
+        current_index = state['last_index'] + 1
+        is_html = True
+        
+        if 0 <= current_index < 200:
+            is_html = True
+            current_format = "HTML"
+        elif 200 <= current_index < 400:
+            is_html = False
+            current_format = "Text"
+        else:
+            # Default to HTML for anything after 400, or you can adjust this
+            is_html = True
+            current_format = "HTML"
+
         # Check Unsubscribe List
         if to_email in unsubscribed_emails:
             print(f"Skipping {to_email}: Unsubscribed.")
@@ -146,9 +187,10 @@ def main():
             state['last_index'] += 1
             continue
 
-        # Tracking Logic
+        # Tracking & Body Logic
         tracking_id = None
-        current_body = body
+        current_body = html_body if is_html else TEXT_TEMPLATE
+        
         if supabase:
             try:
                 res = supabase.table('email_tracking').insert({
@@ -159,35 +201,40 @@ def main():
                 if res.data:
                     tracking_id = res.data[0]['id']
                     
-                    # 1. Click Tracking for the Button
-                    target_mailto = "mailto:info@sociotechservices.com?subject=Inquiry%20from%20Sociotech%20Email"
-                    encoded_url = urllib.parse.quote(target_mailto)
-                    click_url = f"{SUPABASE_URL}/functions/v1/track-click?id={tracking_id}&url={encoded_url}"
-                    current_body = current_body.replace("{{TRACKING_LINK}}", click_url)
+                    if is_html:
+                        # 1. Click Tracking for the Button
+                        target_mailto = "mailto:info@sociotechservices.com?subject=Book%20a%20Demo"
+                        encoded_url = urllib.parse.quote(target_mailto)
+                        click_url = f"{SUPABASE_URL}/functions/v1/track-click?id={tracking_id}&url={encoded_url}"
+                        current_body = current_body.replace("{{TRACKING_LINK}}", click_url)
+                        
+                        # 2. Open Tracking Pixel
+                        pixel_url = f"{SUPABASE_URL}/functions/v1/track-open?id={tracking_id}"
+                        current_body += f'<img src="{pixel_url}" width="1" height="1" style="display:none !important;" />'
+                        
+                        # 3. Unsubscribe Link
+                        unsub_url = f"{SUPABASE_URL}/functions/v1/unsubscribe?email={urllib.parse.quote(to_email)}"
+                        current_body = current_body.replace("{{UNSUB_LINK}}", unsub_url)
+                    else:
+                        # For Text emails, we just append a simple unsub link at the end
+                        current_body += f"\n\nUnsubscribe: {SUPABASE_URL}/functions/v1/unsubscribe?email={urllib.parse.quote(to_email)}"
                     
-                    # 2. Open Tracking Pixel
-                    pixel_url = f"{SUPABASE_URL}/functions/v1/track-open?id={tracking_id}"
-                    current_body += f'<img src="{pixel_url}" width="1" height="1" style="display:none !important;" />'
-                    
-                    # 3. Unsubscribe Link
-                    unsub_url = f"{SUPABASE_URL}/functions/v1/unsubscribe?email={urllib.parse.quote(to_email)}"
-                    current_body = current_body.replace("{{UNSUB_LINK}}", unsub_url)
-                    
-                    print(f"Tracking enabled for {to_email}. ID: {tracking_id}")
+                    print(f"Tracking enabled for {to_email} [{current_format}]. ID: {tracking_id}")
             except Exception as e:
                 print(f"Supabase tracking error: {e}")
         
-        # Fallback placeholders
-        current_body = current_body.replace("{{TRACKING_LINK}}", "mailto:info@sociotechservices.com?subject=Inquiry%20from%20Sociotech%20Email")
-        current_body = current_body.replace("{{UNSUB_LINK}}", "#")
+        # Fallback placeholders for HTML
+        if is_html:
+            current_body = current_body.replace("{{TRACKING_LINK}}", "mailto:info@sociotechservices.com?subject=Book%20a%20Demo")
+            current_body = current_body.replace("{{UNSUB_LINK}}", "#")
 
         # Rotate through available accounts alternatively
         account_index = state['emails_sent_today'] % len(ACCOUNTS)
         current_account = ACCOUNTS[account_index]
         
-        print(f"Sending email to {to_email} using {current_account['user']} ({state['emails_sent_today'] + 1}/{DAILY_LIMIT})...")
+        print(f"Sending {current_format} email to {to_email} using {current_account['user']} ({state['emails_sent_today'] + 1}/{DAILY_LIMIT})...")
         
-        if send_email(to_email, subject, current_body, current_account):
+        if send_email(to_email, subject, current_body, current_account, is_html):
             state['emails_sent_today'] += 1
             state['last_index'] += 1
             save_state(state) # Save after each successful send
