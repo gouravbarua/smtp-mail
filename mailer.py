@@ -17,7 +17,7 @@ DAILY_LIMIT = 1000  # Total limit across all accounts (500 each)
 DELAY_SECONDS = 30
 
 # Global Message Template
-MESSAGE_SUBJECT = "Hello from SocioTech Services!"
+MESSAGE_SUBJECT = "Transform Your Business with sociotech services"
 
 def load_template():
     if os.path.exists(TEMPLATE_FILE):
