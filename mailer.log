@@ -1,0 +1,2 @@
+2026-04-29 09:04:01,843 [INFO] Loaded 0 sender accounts.
+2026-04-29 09:04:01,843 [CRITICAL] No sender accounts found! Check your GitHub Secrets (EMAIL_USER, EMAIL_PASS).
